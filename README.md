@@ -1,14 +1,16 @@
 # AutoBumper
 
-A Discord selfbot that can automatically bump your server on Disboard.
+A Discord selfbot that can automatically bump your server on Disboard with intelligent timing.
 
 ## Overview
 
 This selfbot provides the following features:
 - Responds to basic commands like `!ping`
-- Automatically sends `/bump` commands to Disboard bot every 10 minutes
+- Automatically sends `/bump` commands to Disboard bot with intelligent timing
 - Extracts and displays embed information from Disboard bot responses
+- Tracks bump statistics and optimizes bump timing
 - Configurable through simple commands
+- Debug mode for faster testing
 
 ## Configuration
 
@@ -16,7 +18,7 @@ The bot is configured to:
 - Only interact with channel ID: 1341675216635559964
 - Only in server ID: 1340995921332273255
 - Only respond to user ID: 686107711829704725
-- Auto-bump interval: 10 minutes
+- Default bump interval: 10 minutes (normal mode) or 1 minute (debug mode)
 
 ## Usage
 
@@ -25,24 +27,59 @@ The bot is configured to:
 npm install
 ```
 
-2. Run the bot:
+2. Run the bot in normal mode:
 ```
 node index.js
+```
+
+3. Run the bot in debug mode (1-minute intervals):
+```
+DEBUG=1 node index.js
 ```
 
 ## Commands
 
 - `!ping`: The bot will respond with "pong"
 - `!help`: The bot will respond with a list of available commands
-- `!startbump`: Start the auto-bumping process (sends `/bump` every 10 minutes)
+- `!startbump`: Start the auto-bumping process
 - `!stopbump`: Stop the auto-bumping process
-- `!bumpstatus`: Check if auto-bumping is currently enabled or disabled
+- `!bumpstatus`: Check if auto-bumping is currently enabled and when the next bump is scheduled
+- `!bumpstats`: Display statistics about bump attempts, success rate, and timing
+- `!resetstats`: Reset the bump statistics
 
-## Auto-Bumping
+## Intelligent Auto-Bumping
 
-The bot can automatically send the `/bump` command to the Disboard bot (ID: 302050872383242240) every 10 minutes. When the Disboard bot responds, the selfbot will extract and display the embed information (title and description) from the response.
+The bot can automatically send the `/bump` command to the Disboard bot (ID: 302050872383242240) with intelligent timing. When the Disboard bot responds, the selfbot will:
 
-To start auto-bumping, send `!startbump` in the configured channel. To stop, send `!stopbump`.
+1. Extract and display the embed information (title and description)
+2. Analyze the response to determine if the bump was successful
+3. If the bump failed with a "wait" message, extract the required wait time
+4. Schedule the next bump attempt based on the extracted wait time
+5. Track statistics to optimize future bump timing
+
+The bot adapts to Disboard's requirements and will automatically schedule bumps at the optimal time, avoiding unnecessary failed attempts.
+
+## State Tracking
+
+The bot maintains state information about:
+- Last bump time
+- Next scheduled bump time
+- Total bump attempts
+- Successful bumps
+- Failed bumps
+- Average wait times
+
+This information is used to optimize the bumping process and can be viewed with the `!bumpstats` command.
+
+## Debug Mode
+
+For testing purposes, you can run the bot in debug mode by setting the `DEBUG` environment variable:
+
+```
+DEBUG=1 node index.js
+```
+
+In debug mode, the bot will use 1-minute intervals instead of the standard 2-hour cooldown after successful bumps.
 
 ## Note
 
