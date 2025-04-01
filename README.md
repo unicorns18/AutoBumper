@@ -1,10 +1,10 @@
 # AutoBumper
 
-A Discord selfbot that can automatically bump your server on Disboard with intelligent timing.
+A repository for Discord automation tools, featuring a selfbot that can automatically bump your server on Disboard with intelligent timing.
 
 ## Overview
 
-This selfbot provides the following features:
+This repository contains various Discord automation tools, including a selfbot with the following features:
 - Responds to basic commands like `!ping`
 - Automatically sends `/bump` commands to Disboard bot with intelligent timing
 - Extracts and displays embed information from Disboard bot responses
