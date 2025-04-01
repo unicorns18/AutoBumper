@@ -55,21 +55,23 @@ The bot can automatically send the `/bump` command to the Disboard bot (ID: 3020
 2. Analyze the response to determine if the bump was successful
 3. If the bump failed with a "wait" message, extract the required wait time
 4. Schedule the next bump attempt based on the extracted wait time
-5. Track statistics to optimize future bump timing
+5. Add a random time offset (3-20 minutes) to appear more human-like
+6. Track statistics to optimize future bump timing
 
-The bot adapts to Disboard's requirements and will automatically schedule bumps at the optimal time, avoiding unnecessary failed attempts.
+The bot adapts to Disboard's requirements and will automatically schedule bumps at the optimal time, avoiding unnecessary failed attempts. The random time offset makes the bot's behavior less predictable and more human-like.
 
 ## State Tracking
 
 The bot maintains state information about:
 - Last bump time
-- Next scheduled bump time
+- Next scheduled bump time (including random offset)
 - Total bump attempts
 - Successful bumps
 - Failed bumps
 - Average wait times
+- Random time offsets applied
 
-This information is used to optimize the bumping process and can be viewed with the `!bumpstats` command.
+This information is used to optimize the bumping process and can be viewed with the `!bumpstats` command. The random time offsets (3-20 minutes) are added to the standard wait times to make the bot's behavior appear more human-like and less predictable.
 
 ## Debug Mode
 

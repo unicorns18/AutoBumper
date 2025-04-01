@@ -27,6 +27,15 @@ let bumpState = {
   waitTimes: [] // Track wait times to optimize timing
 };
 
+// Function to generate a random time offset (between 3 and 20 minutes)
+function getRandomTimeOffset() {
+  // Random minutes between 3 and 20
+  const minOffset = 3;
+  const maxOffset = 20;
+  const randomMinutes = Math.floor(Math.random() * (maxOffset - minOffset + 1)) + minOffset;
+  return randomMinutes * 60 * 1000; // Convert to milliseconds
+}
+
 // Function to calculate optimal bump interval based on past wait times
 function calculateOptimalBumpInterval() {
   if (bumpState.waitTimes.length === 0) {
@@ -199,12 +208,27 @@ client.on('messageCreate', async (message) => {
     }
     
     if (bumpState.nextBumpTime) {
-      statsMessage += `- Next scheduled bump: ${new Date(bumpState.nextBumpTime).toLocaleString()}\n`;
+      const now = Date.now();
+      const timeUntilNextBump = bumpState.nextBumpTime - now;
+      
+      if (timeUntilNextBump > 0) {
+        const minutesUntilNextBump = Math.ceil(timeUntilNextBump / 60000);
+        statsMessage += `- Next scheduled bump: ${new Date(bumpState.nextBumpTime).toLocaleString()} (in ${minutesUntilNextBump} minutes)\n`;
+      } else {
+        statsMessage += `- Next scheduled bump: ${new Date(bumpState.nextBumpTime).toLocaleString()} (due now)\n`;
+      }
     }
     
     if (bumpState.waitTimes.length > 0) {
       const avgWaitTime = bumpState.waitTimes.reduce((a, b) => a + b, 0) / bumpState.waitTimes.length;
       statsMessage += `- Average wait time: ${(avgWaitTime / 60000).toFixed(1)} minutes\n`;
+    }
+    
+    // Add information about randomization
+    if (!DEBUG_MODE) {
+      const minOffset = 3;
+      const maxOffset = 20;
+      statsMessage += `- Human-like randomization: +${minOffset} to +${maxOffset} minutes added to each schedule\n`;
     }
     
     statsMessage += `- Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`;
@@ -260,7 +284,10 @@ client.on('messageCreate', async (message) => {
         // In normal operation, we'd wait the standard 2 hours (7200000 ms)
         // In debug mode, we'll use a shorter interval
         const standardWaitTime = 2 * 60 * 60 * 1000; // 2 hours
-        const waitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : standardWaitTime;
+        
+        // Add randomization to appear more human-like (except in debug mode)
+        const randomOffset = DEBUG_MODE ? 0 : getRandomTimeOffset();
+        const waitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : (standardWaitTime + randomOffset);
         bumpState.nextBumpTime = now + waitTime;
         
         // Schedule the next bump
@@ -271,6 +298,9 @@ client.on('messageCreate', async (message) => {
           
           if (DEBUG_MODE) {
             console.log(`DEBUG MODE: Using ${DEFAULT_BUMP_INTERVAL_MS / 60000} minute interval instead of standard ${standardWaitTime / 60000 / 60} hour cooldown`);
+          } else if (randomOffset > 0) {
+            const randomMinutes = Math.round(randomOffset / 60000);
+            console.log(`Added random offset of +${randomMinutes} minutes to appear more human-like`);
           }
           
           console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
@@ -291,7 +321,9 @@ client.on('messageCreate', async (message) => {
           bumpState.waitTimes.push(waitTimeMs);
           
           // In debug mode, override the wait time to use the debug interval
-          const actualWaitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : waitTimeMs;
+          // In normal mode, add random offset to appear more human-like
+          const randomOffset = DEBUG_MODE ? 0 : getRandomTimeOffset();
+          const actualWaitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : (waitTimeMs + randomOffset);
           
           // Set the next bump time
           bumpState.nextBumpTime = now + actualWaitTime;
@@ -304,6 +336,9 @@ client.on('messageCreate', async (message) => {
             
             if (DEBUG_MODE) {
               console.log(`DEBUG MODE: Overriding wait time to ${DEFAULT_BUMP_INTERVAL_MS / 60000} minutes instead of ${waitTimeMs / 60000} minutes`);
+            } else if (randomOffset > 0) {
+              const randomMinutes = Math.round(randomOffset / 60000);
+              console.log(`Added random offset of +${randomMinutes} minutes to appear more human-like`);
             }
             
             console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
