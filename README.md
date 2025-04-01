@@ -24,6 +24,7 @@ node index.js
 ## Commands
 
 - `!ping`: The bot will respond with "pong"
+- `!help`: The bot will respond with a list of available commands
 
 ## Note
 

@@ -26,6 +26,9 @@ client.on('messageCreate', async (message) => {
   if (message.content === '!ping') {
     console.log(`Responding to ping from ${message.author.tag}`);
     await message.reply('pong');
+  } else if (message.content === '!help') {
+    console.log(`Responding to help request from ${message.author.tag}`);
+    await message.reply('Available commands: !ping');
   }
 });
 
