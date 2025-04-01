@@ -1,6 +1,10 @@
-# Discord Selfbot
+# AutoBumper
 
-A simple Discord selfbot that responds to "!ping" with "pong" in a specific channel.
+A repository for Discord automation tools.
+
+## Overview
+
+This repository contains various Discord automation tools.
 
 ## Configuration
 
