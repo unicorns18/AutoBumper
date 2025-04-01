@@ -100,13 +100,18 @@ This ensures that if the bot is restarted, it will:
 
 ## Logging System
 
-The bot uses a structured logging system (Winston) that:
+The bot uses a custom color-coded logging system that:
 - Logs to both console and files
-- Supports different log levels (error, warn, info, debug)
+- Uses intuitive prefixes with color coding:
+  - `[+]` (Green) - Success messages
+  - `[-]` (Yellow) - Warning messages
+  - `[!]` (Red) - Error messages
+  - `[*]` (Blue) - Information messages
+  - `[B]` (Magenta) - Bump-related messages
+  - `[D]` (Cyan) - Debug messages
 - Stores logs in the `logs` directory
-- Rotates log files when they reach 5MB
 - Keeps separate error logs
-- Includes timestamps and structured metadata
+- Includes timestamps and structured data
 
 Log files:
 - `auto-bumper.log`: Contains all logs
@@ -116,6 +121,12 @@ You can adjust the log level by setting the `LOG_LEVEL` environment variable:
 ```
 LOG_LEVEL=debug node index.js
 ```
+
+Available log levels (from highest to lowest priority):
+1. `error` - Only show errors
+2. `warn` - Show errors and warnings
+3. `info` - Show errors, warnings, and info messages
+4. `debug` - Show all messages (default)
 
 ## Note
 
