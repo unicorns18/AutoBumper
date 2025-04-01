@@ -45,7 +45,8 @@ async function sendBumpCommand() {
   
   // Check if we're trying to bump too early based on tracked next bump time
   const now = Date.now();
-  if (bumpState.nextBumpTime && now < bumpState.nextBumpTime) {
+  if (bumpState.nextBumpTime && now < bumpState.nextBumpTime && !DEBUG_MODE) {
+    // In normal mode, respect the next bump time
     const waitTimeMs = bumpState.nextBumpTime - now;
     const waitTimeMin = Math.ceil(waitTimeMs / 60000);
     console.log(`Cannot bump yet. Need to wait approximately ${waitTimeMin} more minutes.`);
@@ -57,6 +58,9 @@ async function sendBumpCommand() {
     console.log(`Rescheduling bump for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
     bumpTimer = setTimeout(sendBumpCommand, waitTimeMs + 1000); // Add 1 second buffer
     return;
+  } else if (DEBUG_MODE && bumpState.nextBumpTime && now < bumpState.nextBumpTime) {
+    // In debug mode, we'll override and bump anyway
+    console.log(`DEBUG MODE: Overriding next bump time check. Would normally wait until ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
   }
   
   try {
@@ -255,7 +259,8 @@ client.on('messageCreate', async (message) => {
         
         // In normal operation, we'd wait the standard 2 hours (7200000 ms)
         // In debug mode, we'll use a shorter interval
-        const waitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : 2 * 60 * 60 * 1000;
+        const standardWaitTime = 2 * 60 * 60 * 1000; // 2 hours
+        const waitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : standardWaitTime;
         bumpState.nextBumpTime = now + waitTime;
         
         // Schedule the next bump
@@ -263,6 +268,11 @@ client.on('messageCreate', async (message) => {
           if (bumpTimer) {
             clearTimeout(bumpTimer);
           }
+          
+          if (DEBUG_MODE) {
+            console.log(`DEBUG MODE: Using ${DEFAULT_BUMP_INTERVAL_MS / 60000} minute interval instead of standard ${standardWaitTime / 60000 / 60} hour cooldown`);
+          }
+          
           console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
           bumpTimer = setTimeout(sendBumpCommand, waitTime);
         }
@@ -280,16 +290,24 @@ client.on('messageCreate', async (message) => {
           // Add to our tracking for optimization
           bumpState.waitTimes.push(waitTimeMs);
           
+          // In debug mode, override the wait time to use the debug interval
+          const actualWaitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : waitTimeMs;
+          
           // Set the next bump time
-          bumpState.nextBumpTime = now + waitTimeMs;
+          bumpState.nextBumpTime = now + actualWaitTime;
           
           // Schedule the next bump
           if (isBumpEnabled) {
             if (bumpTimer) {
               clearTimeout(bumpTimer);
             }
+            
+            if (DEBUG_MODE) {
+              console.log(`DEBUG MODE: Overriding wait time to ${DEFAULT_BUMP_INTERVAL_MS / 60000} minutes instead of ${waitTimeMs / 60000} minutes`);
+            }
+            
             console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
-            bumpTimer = setTimeout(sendBumpCommand, waitTimeMs + 1000); // Add 1 second buffer
+            bumpTimer = setTimeout(sendBumpCommand, actualWaitTime + 1000); // Add 1 second buffer
           }
         } else {
           // If we couldn't extract the time, use a default
