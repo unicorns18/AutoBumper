@@ -1,4 +1,8 @@
 const { Client } = require('discord.js-selfbot-v13');
+const fs = require('fs');
+const path = require('path');
+const logger = require('./logger');
+
 const client = new Client({
   checkUpdate: false,
 });
@@ -8,6 +12,7 @@ const TOKEN = 'NzYzNzkyMDUyNTU4NjI2ODM2.GwTHas.SicmBAoi0eFOpOBbbSO0kmney54eMiaIH
 const TARGET_SERVER_ID = '1340995921332273255';
 const TARGET_CHANNEL_ID = '1341675216635559964';
 const AUTHORIZED_USER_ID = '686107711829704725';
+const STATE_FILE_PATH = path.join(__dirname, 'bump_state.json');
 
 // Debug mode - if DEBUG environment variable is set to 1, use 1 minute interval
 const DEBUG_MODE = process.env.DEBUG === '1';
@@ -18,14 +23,60 @@ let bumpChannel = null;
 let bumpTimer = null;
 let isBumpEnabled = false;
 let nextBumpTime = null;
+
+// Default state
 let bumpState = {
   lastBumpTime: null,
   nextBumpTime: null,
   bumpCount: 0,
   successCount: 0,
   failureCount: 0,
-  waitTimes: [] // Track wait times to optimize timing
+  waitTimes: [], // Track wait times to optimize timing
+  lastSaved: Date.now()
 };
+
+// Function to load state from file
+function loadState() {
+  try {
+    if (fs.existsSync(STATE_FILE_PATH)) {
+      const data = fs.readFileSync(STATE_FILE_PATH, 'utf8');
+      const loadedState = JSON.parse(data);
+      logger.state('Loaded state from file', { path: STATE_FILE_PATH });
+      
+      // Merge loaded state with default state to ensure all properties exist
+      bumpState = { ...bumpState, ...loadedState };
+      
+      // If we have a next bump time in the future, schedule it
+      if (bumpState.nextBumpTime && bumpState.nextBumpTime > Date.now()) {
+        nextBumpTime = bumpState.nextBumpTime;
+        const nextTime = new Date(nextBumpTime).toLocaleTimeString();
+        logger.state(`Restored scheduled bump time: ${nextTime}`, { nextBumpTime });
+      }
+      
+      return true;
+    }
+  } catch (error) {
+    logger.error('Error loading state', { error: error.message, stack: error.stack });
+  }
+  return false;
+}
+
+// Function to save state to file
+function saveState() {
+  try {
+    bumpState.lastSaved = Date.now();
+    const data = JSON.stringify(bumpState, null, 2);
+    fs.writeFileSync(STATE_FILE_PATH, data);
+    logger.state('State saved to file', { path: STATE_FILE_PATH });
+    return true;
+  } catch (error) {
+    logger.error('Error saving state', { error: error.message, stack: error.stack });
+    return false;
+  }
+}
+
+// Load state on startup
+loadState();
 
 // Function to generate a random time offset (between 3 and 20 minutes)
 function getRandomTimeOffset() {
@@ -50,7 +101,10 @@ function calculateOptimalBumpInterval() {
 
 // Function to send the /bump command
 async function sendBumpCommand() {
-  if (!bumpChannel || !isBumpEnabled) return;
+  if (!bumpChannel || !isBumpEnabled) {
+    logger.debug('Bump command not sent - channel not available or bumping disabled');
+    return;
+  }
   
   // Check if we're trying to bump too early based on tracked next bump time
   const now = Date.now();
@@ -58,30 +112,37 @@ async function sendBumpCommand() {
     // In normal mode, respect the next bump time
     const waitTimeMs = bumpState.nextBumpTime - now;
     const waitTimeMin = Math.ceil(waitTimeMs / 60000);
-    console.log(`Cannot bump yet. Need to wait approximately ${waitTimeMin} more minutes.`);
+    logger.bump(`Cannot bump yet. Need to wait approximately ${waitTimeMin} more minutes.`, { waitTimeMin });
     
     // Reschedule the bump for when it's available
     if (bumpTimer) {
       clearTimeout(bumpTimer);
     }
-    console.log(`Rescheduling bump for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
+    
+    const nextTime = new Date(bumpState.nextBumpTime).toLocaleTimeString();
+    logger.bump(`Rescheduling bump for ${nextTime}`, { nextBumpTime: bumpState.nextBumpTime });
     bumpTimer = setTimeout(sendBumpCommand, waitTimeMs + 1000); // Add 1 second buffer
     return;
   } else if (DEBUG_MODE && bumpState.nextBumpTime && now < bumpState.nextBumpTime) {
     // In debug mode, we'll override and bump anyway
-    console.log(`DEBUG MODE: Overriding next bump time check. Would normally wait until ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
+    const nextTime = new Date(bumpState.nextBumpTime).toLocaleTimeString();
+    logger.bump(`DEBUG MODE: Overriding next bump time check. Would normally wait until ${nextTime}`, 
+      { debugMode: true, nextBumpTime: bumpState.nextBumpTime });
   }
   
   try {
-    console.log(`Sending /bump command in channel ${bumpChannel.name}...`);
+    logger.bump(`Sending /bump command in channel ${bumpChannel.name}...`, { channelId: bumpChannel.id });
     await bumpChannel.sendSlash('302050872383242240', 'bump');
-    console.log('Bump command sent successfully');
+    logger.bump('Bump command sent successfully');
     
     // Update state
     bumpState.lastBumpTime = now;
     bumpState.bumpCount++;
+    
+    // Save state after updating
+    saveState();
   } catch (error) {
-    console.error('Error sending bump command:', error);
+    logger.error('Error sending bump command', { error: error.message, stack: error.stack });
   }
 }
 
@@ -93,7 +154,8 @@ function startAutoBump() {
   
   isBumpEnabled = true;
   const intervalMs = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : calculateOptimalBumpInterval();
-  console.log(`Starting auto-bump with ${intervalMs / 60000} minute interval${DEBUG_MODE ? ' (DEBUG MODE)' : ''}`);
+  logger.info(`Starting auto-bump with ${intervalMs / 60000} minute interval${DEBUG_MODE ? ' (DEBUG MODE)' : ''}`, 
+    { intervalMinutes: intervalMs / 60000, debugMode: DEBUG_MODE });
   
   // Send the first bump immediately
   sendBumpCommand();
@@ -110,16 +172,21 @@ function stopAutoBump() {
   }
   
   isBumpEnabled = false;
-  console.log('Auto-bump stopped');
+  logger.info('Auto-bump stopped');
   
-  // Save state to console for debugging
-  console.log('Bump session stats:');
-  console.log(`- Total bumps attempted: ${bumpState.bumpCount}`);
-  console.log(`- Successful bumps: ${bumpState.successCount}`);
-  console.log(`- Failed bumps: ${bumpState.failureCount}`);
+  // Log bump session stats
+  let statsObj = {
+    bumpCount: bumpState.bumpCount,
+    successCount: bumpState.successCount,
+    failureCount: bumpState.failureCount
+  };
+  
   if (bumpState.waitTimes.length > 0) {
     const avgWaitTime = bumpState.waitTimes.reduce((a, b) => a + b, 0) / bumpState.waitTimes.length;
-    console.log(`- Average wait time: ${avgWaitTime / 60000} minutes`);
+    statsObj.avgWaitTimeMinutes = avgWaitTime / 60000;
+    logger.info('Bump session stats', statsObj);
+  } else {
+    logger.info('Bump session stats', statsObj);
   }
 }
 
@@ -140,21 +207,22 @@ function extractWaitTime(description) {
 }
 
 client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-  console.log(`Watching channel ${TARGET_CHANNEL_ID} in server ${TARGET_SERVER_ID}`);
-  console.log(`Only responding to user ${AUTHORIZED_USER_ID}`);
+  logger.info(`Logged in as ${client.user.tag}!`, { username: client.user.tag });
+  logger.info(`Watching channel ${TARGET_CHANNEL_ID} in server ${TARGET_SERVER_ID}`, 
+    { channelId: TARGET_CHANNEL_ID, serverId: TARGET_SERVER_ID });
+  logger.info(`Only responding to user ${AUTHORIZED_USER_ID}`, { authorizedUserId: AUTHORIZED_USER_ID });
   
   // Get the channel for bumping
   const guild = client.guilds.cache.get(TARGET_SERVER_ID);
   if (guild) {
     bumpChannel = guild.channels.cache.get(TARGET_CHANNEL_ID);
     if (bumpChannel) {
-      console.log(`Bump channel set to #${bumpChannel.name}`);
+      logger.info(`Bump channel set to #${bumpChannel.name}`, { channelName: bumpChannel.name, channelId: bumpChannel.id });
     } else {
-      console.error(`Could not find channel with ID ${TARGET_CHANNEL_ID}`);
+      logger.error(`Could not find channel with ID ${TARGET_CHANNEL_ID}`, { channelId: TARGET_CHANNEL_ID });
     }
   } else {
-    console.error(`Could not find server with ID ${TARGET_SERVER_ID}`);
+    logger.error(`Could not find server with ID ${TARGET_SERVER_ID}`, { serverId: TARGET_SERVER_ID });
   }
 });
 
@@ -167,16 +235,18 @@ client.on('messageCreate', async (message) => {
   
   // Handle commands
   if (message.content === '!ping') {
-    console.log(`Responding to ping from ${message.author.tag}`);
+    logger.info(`Responding to ping from ${message.author.tag}`, { user: message.author.tag, command: 'ping' });
     await message.reply('pong');
   } else if (message.content === '!help') {
-    console.log(`Responding to help request from ${message.author.tag}`);
+    logger.info(`Responding to help request from ${message.author.tag}`, { user: message.author.tag, command: 'help' });
     await message.reply('Available commands: !ping, !startbump, !stopbump, !bumpstatus, !bumpstats, !resetstats');
   } else if (message.content === '!startbump') {
+    logger.info(`Starting auto-bump for ${message.author.tag}`, { user: message.author.tag, command: 'startbump' });
     startAutoBump();
     const intervalText = DEBUG_MODE ? '1 minute (DEBUG MODE)' : 'optimized intervals';
     await message.reply(`Auto-bump started. Will send /bump every ${intervalText}.`);
   } else if (message.content === '!stopbump') {
+    logger.info(`Stopping auto-bump for ${message.author.tag}`, { user: message.author.tag, command: 'stopbump' });
     stopAutoBump();
     await message.reply('Auto-bump stopped.');
   } else if (message.content === '!bumpstatus') {
@@ -194,6 +264,13 @@ client.on('messageCreate', async (message) => {
         reply += '\nNext bump will be sent soon.';
       }
     }
+    
+    logger.info(`Status request from ${message.author.tag}`, { 
+      user: message.author.tag, 
+      command: 'bumpstatus',
+      status: isBumpEnabled ? 'enabled' : 'disabled',
+      nextBumpTime: bumpState.nextBumpTime
+    });
     
     await message.reply(reply);
   } else if (message.content === '!bumpstats') {
@@ -233,8 +310,22 @@ client.on('messageCreate', async (message) => {
     
     statsMessage += `- Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`;
     
+    logger.info(`Stats request from ${message.author.tag}`, { 
+      user: message.author.tag, 
+      command: 'bumpstats',
+      stats: {
+        bumpCount: bumpState.bumpCount,
+        successCount: bumpState.successCount,
+        failureCount: bumpState.failureCount,
+        avgWaitTime: bumpState.waitTimes.length > 0 ? 
+          (bumpState.waitTimes.reduce((a, b) => a + b, 0) / bumpState.waitTimes.length / 60000).toFixed(1) : null
+      }
+    });
+    
     await message.reply(statsMessage);
   } else if (message.content === '!resetstats') {
+    logger.info(`Stats reset by ${message.author.tag}`, { user: message.author.tag, command: 'resetstats' });
+    
     // Reset the bump statistics
     bumpState = {
       lastBumpTime: null,
@@ -242,8 +333,12 @@ client.on('messageCreate', async (message) => {
       bumpCount: 0,
       successCount: 0,
       failureCount: 0,
-      waitTimes: []
+      waitTimes: [],
+      lastSaved: Date.now()
     };
+    
+    // Save the reset state
+    saveState();
     
     await message.reply('Bump statistics have been reset.');
   }
@@ -260,17 +355,14 @@ client.on('messageCreate', async (message) => {
   // Check if the message has embeds (response to /bump command)
   if (message.embeds && message.embeds.length > 0) {
     const embed = message.embeds[0];
-    console.log('\n=== Bump Response ===');
     
-    if (embed.title) {
-      console.log(`Title: ${embed.title}`);
-    }
+    // Log the bump response
+    const embedData = {
+      title: embed.title || '',
+      description: embed.description || ''
+    };
     
-    if (embed.description) {
-      console.log(`Description: ${embed.description}`);
-    }
-    
-    console.log('====================\n');
+    logger.bump('Received bump response from Disboard', embedData);
     
     // Process the response to update our state tracking
     if (embed.description) {
@@ -278,7 +370,7 @@ client.on('messageCreate', async (message) => {
       
       // Check for success message
       if (embed.description.includes('Bump done!') || embed.description.includes(':thumbsup:')) {
-        console.log('Bump was successful!');
+        logger.bump('Bump was successful!', { success: true });
         bumpState.successCount++;
         
         // In normal operation, we'd wait the standard 2 hours (7200000 ms)
@@ -290,6 +382,9 @@ client.on('messageCreate', async (message) => {
         const waitTime = DEBUG_MODE ? DEFAULT_BUMP_INTERVAL_MS : (standardWaitTime + randomOffset);
         bumpState.nextBumpTime = now + waitTime;
         
+        // Save state after updating
+        saveState();
+        
         // Schedule the next bump
         if (isBumpEnabled) {
           if (bumpTimer) {
@@ -297,25 +392,28 @@ client.on('messageCreate', async (message) => {
           }
           
           if (DEBUG_MODE) {
-            console.log(`DEBUG MODE: Using ${DEFAULT_BUMP_INTERVAL_MS / 60000} minute interval instead of standard ${standardWaitTime / 60000 / 60} hour cooldown`);
+            logger.bump(`DEBUG MODE: Using ${DEFAULT_BUMP_INTERVAL_MS / 60000} minute interval instead of standard ${standardWaitTime / 60000 / 60} hour cooldown`, 
+              { debugMode: true, intervalMinutes: DEFAULT_BUMP_INTERVAL_MS / 60000 });
           } else if (randomOffset > 0) {
             const randomMinutes = Math.round(randomOffset / 60000);
-            console.log(`Added random offset of +${randomMinutes} minutes to appear more human-like`);
+            logger.bump(`Added random offset of +${randomMinutes} minutes to appear more human-like`, 
+              { randomOffsetMinutes: randomMinutes });
           }
           
-          console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
+          const nextTime = new Date(bumpState.nextBumpTime).toLocaleTimeString();
+          logger.bump(`Next bump scheduled for ${nextTime}`, { nextBumpTime: bumpState.nextBumpTime });
           bumpTimer = setTimeout(sendBumpCommand, waitTime);
         }
       } 
       // Check for wait message
       else if (embed.description.includes('Please wait another')) {
-        console.log('Bump failed - need to wait longer');
+        logger.bump('Bump failed - need to wait longer', { success: false });
         bumpState.failureCount++;
         
         // Extract the wait time from the message
         const waitTimeMs = extractWaitTime(embed.description);
         if (waitTimeMs) {
-          console.log(`Extracted wait time: ${waitTimeMs / 60000} minutes`);
+          logger.bump(`Extracted wait time: ${waitTimeMs / 60000} minutes`, { waitTimeMinutes: waitTimeMs / 60000 });
           
           // Add to our tracking for optimization
           bumpState.waitTimes.push(waitTimeMs);
@@ -328,6 +426,9 @@ client.on('messageCreate', async (message) => {
           // Set the next bump time
           bumpState.nextBumpTime = now + actualWaitTime;
           
+          // Save state after updating
+          saveState();
+          
           // Schedule the next bump
           if (isBumpEnabled) {
             if (bumpTimer) {
@@ -335,19 +436,23 @@ client.on('messageCreate', async (message) => {
             }
             
             if (DEBUG_MODE) {
-              console.log(`DEBUG MODE: Overriding wait time to ${DEFAULT_BUMP_INTERVAL_MS / 60000} minutes instead of ${waitTimeMs / 60000} minutes`);
+              logger.bump(`DEBUG MODE: Overriding wait time to ${DEFAULT_BUMP_INTERVAL_MS / 60000} minutes instead of ${waitTimeMs / 60000} minutes`, 
+                { debugMode: true, originalWaitMinutes: waitTimeMs / 60000, overrideWaitMinutes: DEFAULT_BUMP_INTERVAL_MS / 60000 });
             } else if (randomOffset > 0) {
               const randomMinutes = Math.round(randomOffset / 60000);
-              console.log(`Added random offset of +${randomMinutes} minutes to appear more human-like`);
+              logger.bump(`Added random offset of +${randomMinutes} minutes to appear more human-like`, 
+                { randomOffsetMinutes: randomMinutes });
             }
             
-            console.log(`Next bump scheduled for ${new Date(bumpState.nextBumpTime).toLocaleTimeString()}`);
+            const nextTime = new Date(bumpState.nextBumpTime).toLocaleTimeString();
+            logger.bump(`Next bump scheduled for ${nextTime}`, { nextBumpTime: bumpState.nextBumpTime });
             bumpTimer = setTimeout(sendBumpCommand, actualWaitTime + 1000); // Add 1 second buffer
           }
         } else {
           // If we couldn't extract the time, use a default
           const defaultWaitTime = DEBUG_MODE ? 60 * 1000 : 10 * 60 * 1000;
-          console.log(`Could not extract wait time, using default: ${defaultWaitTime / 60000} minutes`);
+          logger.warn(`Could not extract wait time, using default: ${defaultWaitTime / 60000} minutes`, 
+            { defaultWaitMinutes: defaultWaitTime / 60000 });
           
           if (isBumpEnabled) {
             if (bumpTimer) {
@@ -363,12 +468,14 @@ client.on('messageCreate', async (message) => {
 
 // Handle errors
 client.on('error', (error) => {
-  console.error('Discord client error:', error);
+  logger.error('Discord client error', { error: error.message, stack: error.stack });
 });
+
+// Set up auto-save of state every 5 minutes
+setInterval(saveState, 5 * 60 * 1000);
 
 // Login to Discord
+logger.info('Starting Discord selfbot...');
 client.login(TOKEN).catch(error => {
-  console.error('Failed to login:', error);
+  logger.error('Failed to login', { error: error.message, stack: error.stack });
 });
-
-console.log('Starting Discord selfbot...');

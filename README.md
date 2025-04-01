@@ -11,6 +11,8 @@ This repository contains various Discord automation tools, including a selfbot w
 - Tracks bump statistics and optimizes bump timing
 - Configurable through simple commands
 - Debug mode for faster testing
+- State persistence across restarts
+- Structured logging system with different log levels
 
 ## Configuration
 
@@ -82,6 +84,38 @@ DEBUG=1 node index.js
 ```
 
 In debug mode, the bot will use 1-minute intervals instead of the standard 2-hour cooldown after successful bumps.
+
+## State Persistence
+
+The bot automatically saves its state to a file (`bump_state.json`) in the following situations:
+- After each successful bump
+- After each failed bump with a wait time
+- When statistics are reset
+- Every 5 minutes as a backup
+
+This ensures that if the bot is restarted, it will:
+- Retain all bump statistics
+- Remember the next scheduled bump time
+- Continue operation without losing data
+
+## Logging System
+
+The bot uses a structured logging system (Winston) that:
+- Logs to both console and files
+- Supports different log levels (error, warn, info, debug)
+- Stores logs in the `logs` directory
+- Rotates log files when they reach 5MB
+- Keeps separate error logs
+- Includes timestamps and structured metadata
+
+Log files:
+- `auto-bumper.log`: Contains all logs
+- `error.log`: Contains only error logs
+
+You can adjust the log level by setting the `LOG_LEVEL` environment variable:
+```
+LOG_LEVEL=debug node index.js
+```
 
 ## Note
 

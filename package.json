@@ -11,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "discord.js-selfbot-v13": "^3.6.1"
+    "discord.js-selfbot-v13": "^3.6.1",
+    "winston": "^3.17.0"
   }
 }
