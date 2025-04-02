@@ -11,6 +11,11 @@ yarn-error.log
 .env.test.local
 .env.production.local
 
+# Configuration and state files
+config.json
+bump_state.json
+logs/
+
 # IDE
 .idea/
 .vscode/
