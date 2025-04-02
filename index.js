@@ -78,7 +78,7 @@ const AUTHORIZED_USER_ID = config.authorizedUserId;
 
 // Debug mode - can be set in config.json or via environment variable
 const DEBUG_MODE = config.debug === true || process.env.DEBUG === '1';
-const DEFAULT_BUMP_INTERVAL_MS = DEBUG_MODE ? 60 * 1000 : 10 * 60 * 1000; // 1 or 10 minutes
+const DEFAULT_BUMP_INTERVAL_MS = DEBUG_MODE ? 60 * 1000 : 2 * 60 * 60 * 1000; // 1 minute (debug) or 2 hours (normal)
 
 // Set log level from config if available
 if (config.logging && config.logging.level) {
