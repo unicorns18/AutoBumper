@@ -16,10 +16,37 @@ This repository contains various Discord automation tools, including a selfbot w
 
 ## Configuration
 
-The bot is configured to:
-- Only interact with channel ID: 1341675216635559964
-- Only in server ID: 1340995921332273255
-- Only respond to user ID: 686107711829704725
+The bot uses a `config.json` file for configuration. On first run, a template file will be created that you need to fill in with your details.
+
+Example configuration:
+```json
+{
+  "token": "YOUR_DISCORD_TOKEN_HERE",
+  "targetServerId": "YOUR_SERVER_ID_HERE",
+  "targetChannelId": "YOUR_CHANNEL_ID_HERE",
+  "authorizedUserId": "YOUR_USER_ID_HERE",
+  "debug": false,
+  "logging": {
+    "level": "info",
+    "directory": "logs"
+  }
+}
+```
+
+Required settings:
+- `token`: Your Discord account token
+- `targetServerId`: The ID of the server where the bot will operate
+- `targetChannelId`: The ID of the channel where the bot will send and listen for messages
+- `authorizedUserId`: The ID of the user who can control the bot
+
+Optional settings:
+- `debug`: Set to `true` to enable debug mode (1-minute intervals)
+- `logging.level`: Set the logging level (`error`, `warn`, `info`, or `debug`)
+- `logging.directory`: Set the directory where logs will be stored
+
+Default behavior:
+- Only interacts with the specified channel ID
+- Only responds to the specified user ID
 - Default bump interval: 10 minutes (normal mode) or 1 minute (debug mode)
 
 ## Usage
@@ -29,14 +56,26 @@ The bot is configured to:
 npm install
 ```
 
-2. Run the bot in normal mode:
+2. Run the bot for the first time to generate the config file:
 ```
 node index.js
 ```
 
-3. Run the bot in debug mode (1-minute intervals):
+3. Edit the `config.json` file with your Discord token and other settings
+
+4. Run the bot again to start:
+```
+node index.js
+```
+
+5. Alternatively, run with debug mode via environment variable (overrides config setting):
 ```
 DEBUG=1 node index.js
+```
+
+6. Or set a specific log level:
+```
+LOG_LEVEL=debug node index.js
 ```
 
 ## Commands

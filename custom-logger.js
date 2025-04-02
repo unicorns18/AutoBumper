@@ -24,8 +24,26 @@ const levels = {
   debug: { prefix: '[D]', color: colors.cyan, priority: 6 }
 };
 
+// Try to load config for logging directory
+let logsDir;
+try {
+  const configPath = path.join(__dirname, 'config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (config.logging && config.logging.directory) {
+      logsDir = path.join(__dirname, config.logging.directory);
+    }
+  }
+} catch (error) {
+  // Ignore errors, will use default
+}
+
+// If no config or error, use default logs directory
+if (!logsDir) {
+  logsDir = path.join(__dirname, 'logs');
+}
+
 // Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }

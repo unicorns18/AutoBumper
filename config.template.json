@@ -1,0 +1,11 @@
+{
+  "token": "YOUR_DISCORD_TOKEN_HERE",
+  "targetServerId": "YOUR_SERVER_ID_HERE",
+  "targetChannelId": "YOUR_CHANNEL_ID_HERE",
+  "authorizedUserId": "YOUR_USER_ID_HERE",
+  "debug": false,
+  "logging": {
+    "level": "info",
+    "directory": "logs"
+  }
+}

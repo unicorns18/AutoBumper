@@ -1,0 +1,11 @@
+{
+  "token": "NzYzNzkyMDUyNTU4NjI2ODM2.GwTHas.SicmBAoi0eFOpOBbbSO0kmney54eMiaIHN0ua0",
+  "targetServerId": "1340995921332273255",
+  "targetChannelId": "1341675216635559964",
+  "authorizedUserId": "686107711829704725",
+  "debug": false,
+  "logging": {
+    "level": "info",
+    "directory": "logs"
+  }
+}

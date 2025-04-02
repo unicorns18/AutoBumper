@@ -3,20 +3,87 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./custom-logger');
 
+// Configuration file paths
+const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
+const CONFIG_TEMPLATE_PATH = path.join(__dirname, 'config.template.json');
+const STATE_FILE_PATH = path.join(__dirname, 'bump_state.json');
+
+// Check if config file exists, if not create it from template and exit
+if (!fs.existsSync(CONFIG_FILE_PATH)) {
+  try {
+    // Check if template exists
+    if (fs.existsSync(CONFIG_TEMPLATE_PATH)) {
+      // Copy template to config.json
+      fs.copyFileSync(CONFIG_TEMPLATE_PATH, CONFIG_FILE_PATH);
+    } else {
+      // Create config.json with default template
+      const defaultConfig = {
+        "token": "YOUR_DISCORD_TOKEN_HERE",
+        "targetServerId": "YOUR_SERVER_ID_HERE",
+        "targetChannelId": "YOUR_CHANNEL_ID_HERE",
+        "authorizedUserId": "YOUR_USER_ID_HERE",
+        "debug": false,
+        "logging": {
+          "level": "info",
+          "directory": "logs"
+        }
+      };
+      fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(defaultConfig, null, 2));
+    }
+    
+    // Display message and exit
+    console.log('\n\x1b[33m[!] Configuration file not found!\x1b[0m');
+    console.log('\x1b[32m[+] A new config.json file has been created\x1b[0m');
+    console.log('\x1b[36m[*] Please edit the config.json file with your Discord token and other settings\x1b[0m');
+    console.log('\x1b[36m[*] Then restart the bot\x1b[0m\n');
+    process.exit(0);
+  } catch (error) {
+    console.error('\x1b[31m[!] Error creating config file:', error.message, '\x1b[0m');
+    process.exit(1);
+  }
+}
+
+// Load configuration
+let config;
+try {
+  const configData = fs.readFileSync(CONFIG_FILE_PATH, 'utf8');
+  config = JSON.parse(configData);
+  
+  // Validate required fields
+  const requiredFields = ['token', 'targetServerId', 'targetChannelId', 'authorizedUserId'];
+  const missingFields = requiredFields.filter(field => !config[field] || config[field] === `YOUR_${field.toUpperCase()}_HERE`);
+  
+  if (missingFields.length > 0) {
+    console.log('\n\x1b[31m[!] Configuration file is incomplete!\x1b[0m');
+    console.log(`\x1b[33m[-] Missing or invalid fields: ${missingFields.join(', ')}\x1b[0m`);
+    console.log('\x1b[36m[*] Please edit the config.json file with the required information\x1b[0m');
+    console.log('\x1b[36m[*] Then restart the bot\x1b[0m\n');
+    process.exit(1);
+  }
+} catch (error) {
+  console.error('\x1b[31m[!] Error reading config file:', error.message, '\x1b[0m');
+  process.exit(1);
+}
+
+// Set up client
 const client = new Client({
   checkUpdate: false,
 });
 
-// Configuration
-const TOKEN = 'NzYzNzkyMDUyNTU4NjI2ODM2.GwTHas.SicmBAoi0eFOpOBbbSO0kmney54eMiaIHN0ua0';
-const TARGET_SERVER_ID = '1340995921332273255';
-const TARGET_CHANNEL_ID = '1341675216635559964';
-const AUTHORIZED_USER_ID = '686107711829704725';
-const STATE_FILE_PATH = path.join(__dirname, 'bump_state.json');
+// Extract configuration values
+const TOKEN = config.token;
+const TARGET_SERVER_ID = config.targetServerId;
+const TARGET_CHANNEL_ID = config.targetChannelId;
+const AUTHORIZED_USER_ID = config.authorizedUserId;
 
-// Debug mode - if DEBUG environment variable is set to 1, use 1 minute interval
-const DEBUG_MODE = process.env.DEBUG === '1';
+// Debug mode - can be set in config.json or via environment variable
+const DEBUG_MODE = config.debug === true || process.env.DEBUG === '1';
 const DEFAULT_BUMP_INTERVAL_MS = DEBUG_MODE ? 60 * 1000 : 10 * 60 * 1000; // 1 or 10 minutes
+
+// Set log level from config if available
+if (config.logging && config.logging.level) {
+  process.env.LOG_LEVEL = config.logging.level;
+}
 
 // State tracking
 let bumpChannel = null;
