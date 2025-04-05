@@ -47,7 +47,8 @@ Optional settings:
 Default behavior:
 - Only interacts with the specified channel ID
 - Only responds to the specified user ID
-- Default bump interval: 10 minutes (normal mode) or 1 minute (debug mode)
+- In normal mode: Waits for Disboard's standard 2-hour cooldown between bumps, plus a random offset (3-20 minutes) for human-like behavior
+- In debug mode: Uses a 1-minute interval for testing purposes
 
 ## Usage
 
